@@ -72,7 +72,7 @@
               bucket_acl/0,
               location_constraint/0]).
 
--opaque config() :: record(config).
+-opaque config() :: record(config) | atom().
 
 -type bucket_access_type() :: virtual_domain | path.
 
@@ -136,7 +136,7 @@ new(AccessKeyID, SecretAccessKey, Host, BucketAccessType) ->
                   string(), proplists:proplist()) -> proplists:proplist().
 copy_object(DestBucketName, DestKeyName, SrcBucketName, SrcKeyName, Options) ->
     copy_object(DestBucketName, DestKeyName, SrcBucketName,
-                SrcKeyName, Options, default_config()).
+                SrcKeyName, Options, ?DEF_CONFIG).
 
 -spec copy_object(string(), string(), string(), string(),
                   proplists:proplist(), config()) -> proplists:proplist().
@@ -166,7 +166,7 @@ copy_object(DestBucketName, DestKeyName, SrcBucketName, SrcKeyName, Options, Con
 -spec create_bucket(string(), bucket_acl(), location_constraint()) -> ok.
 
 create_bucket(BucketName, ACL, LocationConstraint) ->
-    create_bucket(BucketName, ACL, LocationConstraint, default_config()).
+    create_bucket(BucketName, ACL, LocationConstraint, ?DEF_CONFIG).
 
 -spec create_bucket(string(), bucket_acl(), location_constraint(), config()) -> ok.
 
@@ -200,7 +200,7 @@ encode_acl(bucket_owner_full_control) -> "bucket-owner-full-control".
 -spec delete_bucket(string()) -> ok.
 
 delete_bucket(BucketName) ->
-    delete_bucket(BucketName, default_config()).
+    delete_bucket(BucketName, ?DEF_CONFIG).
 
 -spec delete_bucket(string(), config()) -> ok.
 
@@ -211,7 +211,7 @@ delete_bucket(BucketName, Config)
 -spec delete_object(string(), string()) -> proplists:proplist().
 
 delete_object(BucketName, Key) ->
-    delete_object(BucketName, Key, default_config()).
+    delete_object(BucketName, Key, ?DEF_CONFIG).
 
 -spec delete_object(string(), string(), config()) -> proplists:proplist().
 
@@ -228,7 +228,7 @@ delete_object(BucketName, Key, Config)
                                    proplists:proplist().
 
 delete_object_version(BucketName, Key, Version) ->
-    delete_object_version(BucketName, Key, Version, default_config()).
+    delete_object_version(BucketName, Key, Version, ?DEF_CONFIG).
 
 -spec delete_object_version(string(), string(), string(), config()) ->
                                    proplists:proplist().
@@ -247,7 +247,7 @@ delete_object_version(BucketName, Key, Version, Config)
 -spec list_buckets() -> proplists:proplist().
 
 list_buckets() ->
-    list_buckets(default_config()).
+    list_buckets(?DEF_CONFIG).
 
 -spec list_buckets(config()) -> proplists:proplist().
 
@@ -260,7 +260,7 @@ list_buckets(Config) ->
 -spec list_objects(string(), proplists:proplist()) -> proplists:proplist().
 
 list_objects(BucketName, Options) ->
-    list_objects(BucketName, Options, default_config()).
+    list_objects(BucketName, Options, ?DEF_CONFIG).
 
 -spec list_objects(string(), proplists:proplist(), config()) ->
                           proplists:proplist().
@@ -299,7 +299,7 @@ extract_user([Node]) ->
 -spec get_bucket_attribute(string(), bucket_attribute_name()) -> term().
 
 get_bucket_attribute(BucketName, AttributeName) ->
-    get_bucket_attribute(BucketName, AttributeName, default_config()).
+    get_bucket_attribute(BucketName, AttributeName, ?DEF_CONFIG).
 
 -spec get_bucket_attribute(string(), bucket_attribute_name(), config()) -> term().
 
@@ -440,10 +440,11 @@ format_s3_uri(#config{s3_url=S3Url, bucket_access_type=BAccessType}, Host) ->
 %% augment this function's capabilities.
 -spec s3_url(atom(), string(), string(), integer(),
              proplists:proplist(), config()) -> binary().
-s3_url(Method, BucketName, Key, Lifetime, RawHeaders,
-       Config = #config{access_key_id=AccessKey,
-                        secret_access_key=SecretKey})
+s3_url(Method, BucketName, Key, Lifetime, RawHeaders, Config0)
   when is_list(BucketName), is_list(Key) ->
+
+    #config{access_key_id=AccessKey, secret_access_key=SecretKey} =
+        Config = get_config(Config0),
 
     Expires = erlang:integer_to_list(expiration_time(Lifetime)),
 
@@ -492,7 +493,7 @@ make_signed_url_authorization(SecretKey, Method, CanonicalizedResource,
                         proplists:proplist().
 
 get_object(BucketName, Key, Options) ->
-    get_object(BucketName, Key, Options, default_config()).
+    get_object(BucketName, Key, Options, ?DEF_CONFIG).
 
 -spec get_object(string(), string(), proplists:proplist(), config()) ->
                         proplists:proplist().
@@ -519,7 +520,7 @@ get_object(BucketName, Key, Options, Config) ->
 -spec get_object_acl(string(), string()) -> proplists:proplist().
 
 get_object_acl(BucketName, Key) ->
-    get_object_acl(BucketName, Key, default_config()).
+    get_object_acl(BucketName, Key, ?DEF_CONFIG).
 
 -spec get_object_acl(string(), string(), proplists:proplist() | config()) -> proplists:proplist().
 
@@ -528,7 +529,7 @@ get_object_acl(BucketName, Key, Config)
     get_object_acl(BucketName, Key, [], Config);
 
 get_object_acl(BucketName, Key, Options) ->
-    get_object_acl(BucketName, Key, Options, default_config()).
+    get_object_acl(BucketName, Key, Options, ?DEF_CONFIG).
 
 -spec get_object_acl(string(), string(), proplists:proplist(), config()) -> proplists:proplist().
 
@@ -546,7 +547,7 @@ get_object_acl(BucketName, Key, Options, Config)
 -spec get_object_metadata(string(), string(), proplists:proplist()) -> proplists:proplist().
 
 get_object_metadata(BucketName, Key, Options) ->
-    get_object_metadata(BucketName, Key, Options, default_config()).
+    get_object_metadata(BucketName, Key, Options, ?DEF_CONFIG).
 
 -spec get_object_metadata(string(), string(), proplists:proplist(), config()) -> proplists:proplist().
 
@@ -573,7 +574,7 @@ extract_metadata(Headers) ->
 -spec get_object_torrent(string(), string()) -> proplists:proplist().
 
 get_object_torrent(BucketName, Key) ->
-    get_object_torrent(BucketName, Key, default_config()).
+    get_object_torrent(BucketName, Key, ?DEF_CONFIG).
 
 -spec get_object_torrent(string(), string(), config()) -> proplists:proplist().
 
@@ -586,7 +587,7 @@ get_object_torrent(BucketName, Key, Config) ->
 -spec list_object_versions(string(), proplists:proplist()) -> proplists:proplist().
 
 list_object_versions(BucketName, Options) ->
-    list_object_versions(BucketName, Options, default_config()).
+    list_object_versions(BucketName, Options, ?DEF_CONFIG).
 
 -spec list_object_versions(string(), proplists:proplist(), config()) -> proplists:proplist().
 
@@ -641,7 +642,7 @@ extract_bucket(Node) ->
 -spec put_object(string(), string(), iolist(), proplists:proplist(), [{string(), string()}] | config()) -> proplists:proplist().
 
 put_object(BucketName, Key, Value, Options, HTTPHeaders) ->
-    put_object(BucketName, Key, Value, Options, HTTPHeaders, default_config()).
+    put_object(BucketName, Key, Value, Options, HTTPHeaders, ?DEF_CONFIG).
 
 -spec put_object(string(), string(), iolist(), proplists:proplist(), [{string(), string()}], config()) -> proplists:proplist().
 
@@ -659,7 +660,7 @@ put_object(BucketName, Key, Value, Options, HTTPHeaders, Config)
 -spec set_object_acl(string(), string(), proplists:proplist()) -> ok.
 
 set_object_acl(BucketName, Key, ACL) ->
-    set_object_acl(BucketName, Key, ACL, default_config()).
+    set_object_acl(BucketName, Key, ACL, ?DEF_CONFIG).
 
 -spec set_object_acl(string(), string(), proplists:proplist(), config()) -> ok.
 
@@ -677,7 +678,7 @@ set_object_acl(BucketName, Key, ACL, Config)
 -spec set_bucket_attribute(string(), atom(), term()) -> ok.
 
 set_bucket_attribute(BucketName, AttributeName, Value) ->
-    set_bucket_attribute(BucketName, AttributeName, Value, default_config()).
+    set_bucket_attribute(BucketName, AttributeName, Value, ?DEF_CONFIG).
 
 -spec set_bucket_attribute(string(), atom(), term(), config()) -> ok.
 
@@ -777,9 +778,10 @@ s3_xml_request(Config, Method, Host, Path, Subresource, Params, POSTData, Header
             XML
     end.
 
-s3_request(Config = #config{access_key_id=AccessKey,
-                            secret_access_key=SecretKey},
-           Method, Host, Path, Subresource, Params, POSTData, Headers) ->
+s3_request(Config0, Method, Host, Path, Subresource, Params, POSTData, Headers) ->
+    #config{access_key_id=AccessKey, secret_access_key=SecretKey} =
+        Config = get_config(Config0),
+
     {ContentMD5, ContentType, Body} =
         case POSTData of
             {{StreamFun, Arg}, CT} when is_function(StreamFun) ->
@@ -838,7 +840,7 @@ s3_request(Config = #config{access_key_id=AccessKey,
                        Timeout =
                            case proplists:get_value("content-length", RequestHeaders0) of
                                undefined -> 30000;
-                               Value     -> 
+                               Value     ->
                                    case Value div 5 of
                                        To when To < 30000 -> 30000;
                                        To                 -> To
@@ -873,19 +875,41 @@ make_authorization(AccessKeyId, SecretKey, Method, ContentMD5, ContentType, Date
     Signature = base64:encode(crypto:sha_mac(SecretKey, StringToSign)),
     {StringToSign, ["AWS ", AccessKeyId, $:, Signature]}.
 
-default_config() ->
-    case application:get_env(mini_s3, s3_defaults) of
+get_config(#config{} = Config) -> Config;
+get_config(ConfigName) ->
+    Defaults =
+        case application:get_env(mini_s3, ?DEF_CONFIG) of
+            {ok, DefConfig} -> DefConfig;
+            undefined       -> []
+        end,
+
+    case application:get_env(mini_s3, ConfigName) of
+        {ok, Options} -> config_from_options(Options, Defaults);
+        undefined     -> config_from_options([], Defaults)
+    end.
+
+config_from_options(Options, Defaults) ->
+    #config{s3_url = DefS3Url, bucket_access_type = DefBucketAcessType}
+        = #config{},
+    #config{
+       access_key_id      = get_conf_val(access_key_id, Options, Defaults),
+       secret_access_key  = get_conf_val(secret_access_key, Options, Defaults),
+       s3_url             = get_conf_val(s3_url, Options, Defaults,  DefS3Url),
+       bucket_access_type = get_conf_val(bucket_access_type, Options, Defaults,
+                                         DefBucketAcessType)
+      }.
+
+get_conf_val(Key, Props, Defaults) ->
+    get_conf_val(Key, Props, Defaults, undefined).
+get_conf_val(Key, Props, Defaults, DefaultValue) ->
+    case proplists:get_value(Key, Props) of
         undefined ->
-            throw({error, missing_s3_defaults});
-        {ok, Defaults} ->
-            case proplists:is_defined(key_id, Defaults) andalso
-                proplists:is_defined(secret_access_key, Defaults) of
-                true ->
-                    {key_id, Key} = proplists:lookup(key_id, Defaults),
-                    {secret_access_key, AccessKey} =
-                        proplists:lookup(secret_access_key, Defaults),
-                    #config{access_key_id=Key, secret_access_key=AccessKey};
-                false ->
-                    throw({error, missing_s3_defaults})
-            end
+            case proplists:get_value(Key, Defaults) of
+                undefined when DefaultValue =:= undefined ->
+                    error(mandatory_prop_not_specified,
+                          [Key, Props, Defaults, DefaultValue]);
+                undefined -> DefaultValue;
+                Value     -> Value
+            end;
+        Value -> Value
     end.

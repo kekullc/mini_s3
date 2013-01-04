@@ -25,3 +25,5 @@
           bucket_access_type=virtual_hosted::mini_s3:bucket_access_type()
 
 }).
+
+-define(DEF_CONFIG, default).
