@@ -56,12 +56,15 @@
          s3_url/6,
          put_object/5,
          put_object/6,
+         put_file/5,
+         put_file/6,
          set_object_acl/3,
          set_object_acl/4]).
 
 -export([manual_start/0,
          make_authorization/10,
-         make_signed_url_authorization/5]).
+         make_signed_url_authorization/5,
+         stream_file/1]).
 
 -include("internal.hrl").
 -include_lib("xmerl/include/xmerl.hrl").
@@ -639,6 +642,23 @@ extract_bucket(Node) ->
                     {creation_date, "CreationDate", time}],
                    Node).
 
+put_file(BucketName, Key, Filename, Options, HTTPHeaders) ->
+    put_file(BucketName, Key, Filename, Options, HTTPHeaders, ?DEF_CONFIG).
+
+put_file(BucketName, Key, Filename, Options, HTTPHeaders, Config) ->
+    HTTPHeaders1 =
+        case proplists:is_defined("content-length", HTTPHeaders) of
+            true  -> HTTPHeaders;
+            false ->
+                [{"content-length", filelib:file_size(Filename)} | HTTPHeaders]
+        end,
+    UploadPartSize =
+        proplists:get_value(upload_part_size, Options, ?DEF_UPLOAD_PART_SIZE),
+
+    mini_s3:put_object(BucketName, Key,
+                       {fun ?MODULE:stream_file/1, {Filename, UploadPartSize}},
+                       Options, HTTPHeaders1, Config).
+
 -spec put_object(string(), string(), iolist(), proplists:proplist(), [{string(), string()}] | config()) -> proplists:proplist().
 
 put_object(BucketName, Key, Value, Options, HTTPHeaders) ->
@@ -912,4 +932,18 @@ get_conf_val(Key, Props, Defaults, DefaultValue) ->
                 Value     -> Value
             end;
         Value -> Value
+    end.
+
+
+%% TODO sendfile support
+stream_file({Filename, UploadPartSize}) when is_list(Filename) ->
+    {ok, Iod} = file:open(Filename, [read, raw]),
+    stream_file({Iod, UploadPartSize});
+stream_file({Iod, UploadPartSize}) ->
+    case file:read(Iod, UploadPartSize) of
+        {ok, Data} ->
+            {ok, Data, {Iod, UploadPartSize}};
+        eof ->
+            file:close(Iod),
+            eof
     end.

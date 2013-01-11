@@ -27,3 +27,5 @@
 }).
 
 -define(DEF_CONFIG, default).
+
+-define(DEF_UPLOAD_PART_SIZE, 524288). % in bytes
