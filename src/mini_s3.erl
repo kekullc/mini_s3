@@ -75,7 +75,7 @@
               bucket_acl/0,
               location_constraint/0]).
 
--opaque config() :: record(config) | atom().
+-type config() :: record(config) | atom().
 
 -type bucket_access_type() :: virtual_domain | path.
 
