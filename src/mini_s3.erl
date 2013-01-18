@@ -809,14 +809,7 @@ s3_request(Config0, Method, Host, Path, Subresource, Params, POSTData, Headers) 
             {PD, CT} ->
                 {base64:encode(crypto:md5(PD)), CT, PD};
             PD ->
-                %% On a put/post even with an empty body we need to
-                %% default to some content-type
-                case Method of
-                    _ when put == Method; post == Method ->
-                        {"", "text/xml", PD};
-                    _ ->
-                        {"", "", PD}
-                end
+                {"", "", PD}
         end,
     AmzHeaders = lists:filter(fun ({"x-amz-" ++ _, V}) when
                                         V =/= undefined -> true;
