@@ -85,6 +85,11 @@
                                | request_payment
                                | versioning.
 
+-type settable_bucket_attribute_name() :: acl
+                                        | logging
+                                        | request_payment
+                                        | versioning.
+
 -type bucket_acl() :: private
                     | public_read
                     | public_read_write
@@ -369,7 +374,7 @@ decode_permission("READ_ACP")     -> read_acp.
 
 %% @doc Canonicalizes a proplist of {"Header", "Value"} pairs by
 %% lower-casing all the Headers.
--spec canonicalize_headers([{Header::string(), Value::string()}]) ->
+-spec canonicalize_headers([{string() | binary() | atom(), Value::string()}]) ->
                                   [{LowerCaseHeader::string(), Value::string()}].
 canonicalize_headers(Headers) ->
     [{string:to_lower(to_string(H)), V} || {H, V} <- Headers ].
@@ -659,12 +664,21 @@ put_file(BucketName, Key, Filename, Options, HTTPHeaders, Config) ->
                        {fun ?MODULE:stream_file/1, {Filename, UploadPartSize}},
                        Options, HTTPHeaders1, Config).
 
--spec put_object(string(), string(), iolist(), proplists:proplist(), [{string(), string()}] | config()) -> proplists:proplist().
+-spec put_object(string(),
+                 string(),
+                 iolist(),
+                 proplists:proplist(),
+                 [{string(), string()}]) -> [{'version_id', _}, ...].
 
 put_object(BucketName, Key, Value, Options, HTTPHeaders) ->
     put_object(BucketName, Key, Value, Options, HTTPHeaders, ?DEF_CONFIG).
 
--spec put_object(string(), string(), iolist(), proplists:proplist(), [{string(), string()}], config()) -> proplists:proplist().
+-spec put_object(string(),
+                 string(),
+                 iolist(),
+                 proplists:proplist(),
+                 [{string(), string()}],
+                 config()) -> [{'version_id', _}, ...].
 
 put_object(BucketName, Key, Value, Options, HTTPHeaders, Config)
   when is_list(BucketName), is_list(Key), is_list(Options) ->
@@ -695,12 +709,15 @@ set_object_acl(BucketName, Key, ACL, Config)
     XMLText = list_to_binary(xmerl:export_simple([XML], xmerl_xml)),
     s3_simple_request(Config, put, BucketName, [$/|Key], "acl", [], XMLText, []).
 
--spec set_bucket_attribute(string(), atom(), term()) -> ok.
+-spec set_bucket_attribute(string(),
+                           settable_bucket_attribute_name(),
+                           'bucket_owner' | 'requester' | [any()]) -> ok.
 
 set_bucket_attribute(BucketName, AttributeName, Value) ->
     set_bucket_attribute(BucketName, AttributeName, Value, ?DEF_CONFIG).
 
--spec set_bucket_attribute(string(), atom(), term(), config()) -> ok.
+-spec set_bucket_attribute(string(), settable_bucket_attribute_name(),
+                           'bucket_owner' | 'requester' | [any()], config()) -> ok.
 
 set_bucket_attribute(BucketName, AttributeName, Value, Config)
   when is_list(BucketName) ->
@@ -862,12 +879,14 @@ s3_request(Config0, Method, Host, Path, Subresource, Params, POSTData, Headers) 
                        ibrowse:send_req(RequestURI, RequestHeaders0, Method, Body, [], Timeout)
                end,
     case Response of
-        {ok, Status, ResponseHeaders, ResponseBody} ->
+        {ok, Status, ResponseHeaders0, ResponseBody} ->
+            ResponseHeaders = canonicalize_headers(ResponseHeaders0),
             case erlang:list_to_integer(Status) of
                 OKStatus when OKStatus >= 200, OKStatus =< 299 ->
                     {ResponseHeaders, ResponseBody};
                 BadStatus ->
-                    erlang:error({aws_error, {http_error, BadStatus, ResponseBody}})
+                    erlang:error({aws_error, {http_error, BadStatus,
+                                              {ResponseHeaders, ResponseBody}}})
                 end;
         {error, Error} ->
             erlang:error({aws_error, {socket_error, Error}})
