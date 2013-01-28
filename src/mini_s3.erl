@@ -34,6 +34,8 @@
          list_buckets/1,
          set_bucket_attribute/3,
          set_bucket_attribute/4,
+         du/3,
+         du/4,
          list_objects/2,
          list_objects/3,
          list_object_versions/2,
@@ -139,6 +141,76 @@ new(AccessKeyID, SecretAccessKey, Host, BucketAccessType) ->
 
 
 -define(XMLNS_S3, "http://s3.amazonaws.com/doc/2006-03-01/").
+
+
+%% @doc
+%% Act similar to du unix command but for s3 storage.
+%% Summarize disk usage of each file, recursively for directories.
+%% @end
+du(Bucket, Prefix, Options) ->
+    du(Bucket, Prefix, Options, ?DEF_CONFIG).
+
+du(Bucket, Prefix, Options0, Config) ->
+    SubDirsSizeAcc = 0,
+    SubDirsAcc = dict:new(),
+    DefOptions = [{prefix_delimiter, "/"}, {max_keys, 800}, {max_depth, 0}],
+    OptionsWitDefaults = proplists_keys_store(DefOptions, Options0),
+    Options = proplists_keys_store(
+                OptionsWitDefaults, [{prefix, Prefix}, {marker, undefined}]),
+
+    Delimiter = proplists:get_value(prefix_delimiter, Options),
+    MaxDepth  = proplists:get_value(max_depth, Options),
+
+    ReturnType =
+        if
+            is_list(Prefix)   -> list;
+            is_binary(Prefix) -> binary
+        end,
+    PathComponents = re:split(Prefix, Delimiter, [{return, ReturnType}]),
+
+    PathCompMaxLength = length(PathComponents) + MaxDepth,
+    du(Bucket, PathCompMaxLength, SubDirsSizeAcc, SubDirsAcc, Options, Config).
+
+du(Bucket, PathCompMaxLength, SubDirsSizeAcc, SubDirsAcc, Options, C) ->
+    Response =
+        mini_s3:list_objects(Bucket, Options, C),
+
+    IsTruncated = proplists:get_value(is_truncated, Response),
+    Contents    = proplists:get_value(contents, Response),
+
+    {SubDirsSize, SubDirs} = du(PathCompMaxLength, Contents),
+    NewSubDirsSize  = SubDirsSizeAcc + SubDirsSize,
+    NewSubDirsAcc = dict:merge(fun(_K, V1, V2) -> V1 + V2 end,
+                               SubDirs, SubDirsAcc),
+    if
+        IsTruncated ->
+            LastKey = proplists:get_value(key, lists:last(Contents)),
+            NewOptions = lists:keystore(marker, 1, Options, {marker, LastKey}),
+            du(Bucket, PathCompMaxLength, NewSubDirsSize, NewSubDirsAcc, NewOptions, C);
+        true ->
+            {NewSubDirsSize, dict:to_list(NewSubDirsAcc)}
+    end.
+
+du(PathCompMaxLength, Contents) ->
+    lists:foldl(
+      fun(Object, {SubDirsSizeAcc, SubdirsAcc}) ->
+              Key  = proplists:get_value(key, Object),
+              Size = proplists:get_value(size, Object),
+              FileVpath =
+                  case filename:split(list_to_binary(Key)) of
+                      Tvpath when length(Tvpath) > PathCompMaxLength ->
+                          {Prefix, _Postfix} =
+                              lists:split(PathCompMaxLength, Tvpath),
+                          Prefix;
+                      Tvpath ->
+                          Tvpath
+                  end,
+              {
+                SubDirsSizeAcc + Size,
+                dict:update(FileVpath, fun(OldSize) -> OldSize + Size end,
+                            Size, SubdirsAcc)
+              }
+      end, {0, dict:new()}, Contents).
 
 -spec copy_object(string(), string(), string(),
                   string(), proplists:proplist()) -> proplists:proplist().
@@ -959,3 +1031,8 @@ stream_file({Iod, UploadPartSize}) ->
             file:close(Iod),
             eof
     end.
+
+proplists_keys_store(Propl1, Propl2) ->
+    lists:foldl(fun({K, V}, OptAcc) ->
+                        lists:keystore(K, 1, OptAcc, {K, V})
+                end, Propl1, Propl2).
