@@ -565,7 +565,7 @@ make_signed_url_authorization(SecretKey, Method, CanonicalizedResource,
                                   CanonicalizedResource
                                  ]),
 
-    Signature = base64:encode(crypto:sha_mac(SecretKey, StringToSign)),
+    Signature = base64:encode(crypto:hmac(sha, SecretKey, StringToSign)),
     {StringToSign, Signature}.
 
 
@@ -896,7 +896,7 @@ s3_request(Config0, Method, Host, Path, Subresource, Params, POSTData, Headers) 
             {{StreamFun, Arg}, CT} when is_function(StreamFun) ->
                 {"", CT, {StreamFun, Arg}};
             {PD, CT} ->
-                {base64:encode(crypto:md5(PD)), CT, PD};
+                {base64:encode(crypto:hash(md5, PD)), CT, PD};
             PD ->
                 {"", "", PD}
         end,
@@ -976,7 +976,7 @@ make_authorization(AccessKeyId, SecretKey, Method, ContentMD5, ContentType, Date
                     if_not_empty(Host, [$/, Host]),
                     Resource,
                     if_not_empty(Subresource, [$?, Subresource])],
-    Signature = base64:encode(crypto:sha_mac(SecretKey, StringToSign)),
+    Signature = base64:encode(crypto:hmac(sha, SecretKey, StringToSign)),
     {StringToSign, ["AWS ", AccessKeyId, $:, Signature]}.
 
 get_config(#config{} = Config) -> Config;
